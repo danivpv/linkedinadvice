@@ -1,0 +1,30 @@
+[project]
+name = "linkedinadvice"
+authors = [
+    { name="Daniel Parra", email="danivpv@mxai.dev" }
+]
+license = { text = "MIT" }
+version = "0.1.0"
+description = "Linkedin career path advice PoC."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "gradio>=5.22.0",
+    "langchain>=0.3.21",
+    "langchain-community>=0.3.20",
+    "openai>=1.68.0",
+    "pyperclip>=1.9.0",
+    "python-dotenv>=1.0.1",
+]
+
+# Development and testing dependencies
+dev = [
+    "poethepoet>=0.32.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[tool.poe.tasks]
