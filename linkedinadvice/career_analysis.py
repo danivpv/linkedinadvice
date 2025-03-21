@@ -37,28 +37,47 @@ class CareerAnalyzer:
                 0.34,
             ]  # Slightly more on opportunity to sum to 1.0
 
-        # Prepare consolidated insights
-        insights = user_data.get("insights", "")
+        # Parse the roles data to extract current role and experience
+        roles_list = user_data.get("roles", "").split("\n")
 
-        if user_data.get("prev_roles"):
-            insights += f"\nPrevious Roles: {user_data['prev_roles']}"
+        # Identify current role (first one in the list)
+        current_role = ""
+        current_experience = 0
+        if roles_list and roles_list[0]:
+            parts = roles_list[0].split(" (")
+            if len(parts) == 2:
+                current_role = parts[0]
+                exp_part = parts[1].split(" years")[0]
+                try:
+                    current_experience = int(exp_part)
+                except ValueError:
+                    current_experience = 0
 
-        if user_data.get("edu_achievements"):
-            insights += f"\nEducational Achievements: {user_data['edu_achievements']}"
+        # Format previous roles (all except the first one)
+        prev_roles_str = ", ".join(roles_list[1:]) if len(roles_list) > 1 else ""
 
-        if user_data.get("include_novel_options"):
-            insights += "\nPlease include novel or unconventional career paths in your analysis."
-
-        # Create the prompt
+        # Create the prompt with all available information
         prompt = f"""Analyze the following career profile and generate a taxonomy of potential career paths:
 
-Current Role: {user_data.get("current_role", "")}
-Years of Experience: {user_data.get("experience", "")}
-Notable Achievements: {user_data.get("achievements", "")}
-Education: {user_data.get("education", "")}
+Current Role: {current_role}
+Years in Current Role: {current_experience}
+"""
+
+        # Add previous roles if present
+        if prev_roles_str:
+            prompt += f"Previous Roles: {prev_roles_str}\n"
+
+        # Add all the fields from user_data
+        prompt += f"""Professional Achievements: {user_data.get("achievements", "")}
+Educational Background: {user_data.get("educations", "")}
+Educational Achievements: {user_data.get("edu_achievements", "")}
 Career Goals: {user_data.get("goals", "")}
-Additional Insights: {insights}
+Additional Insights: {user_data.get("insights", "")}
+
 Time Preference: {time_preference}
+Financial Weight: {user_data.get("financial_weight", scoring_weights[0])}
+Impact Weight: {user_data.get("impact_weight", scoring_weights[1])}
+Opportunity Weight: {user_data.get("opportunity_weight", scoring_weights[2])}
 
 Generate 5 potential career paths that align with this profile. For each path, evaluate:
 1. Financial potential (scale 1-10) at 3, 10, and 10+ years
@@ -77,6 +96,15 @@ And the time preference: {time_preference}
 Format the output clearly with sections for each career path, the scoring breakdown, and a final recommendation section ranking the paths from highest to lowest score.
 """
 
+        # Add novel paths instruction if requested
+        if user_data.get("include_novel_options"):
+            prompt += "\nPlease include at least one novel or unconventional career path in your analysis."
+
+        # Print the prompt for debugging
+        print("\n=== CAREER ANALYSIS PROMPT ===\n")
+        print(prompt)
+        print("\n=== END OF PROMPT ===\n")
+
         try:
             # Make the API call
             response = client.chat.completions.create(
@@ -84,7 +112,7 @@ Format the output clearly with sections for each career path, the scoring breakd
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a career advisor specialized in professional path analysis.",
+                        "content": "You are a career advisor specialized in professional path analysis. Your analysis should be comprehensive, data-driven, and tailored to the individual's specific career history and goals.",
                     },
                     {"role": "user", "content": prompt},
                 ],

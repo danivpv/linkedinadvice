@@ -5,7 +5,11 @@ from dotenv import load_dotenv
 
 from linkedinadvice.career_analysis import CareerAnalyzer
 from linkedinadvice.monitoring import monitor_api
-from linkedinadvice.utils import copy_to_clipboard, get_share_link
+from linkedinadvice.utils import (
+    copy_to_clipboard,
+    process_input_data,
+    share_to_linkedin,
+)
 
 # Load environment variables
 load_dotenv()
@@ -65,31 +69,18 @@ def analyze_career(
         "Long-term (10+ years)": "long-term",
     }
 
-    # Parse the roles from the joined string
-    roles_list = roles_data.split("\n")
-
-    # Identify current role (first one in the list)
-    current_role = ""
-    current_experience = 0
-    if roles_list and roles_list[0]:
-        parts = roles_list[0].split(" (")
-        if len(parts) == 2:
-            current_role = parts[0]
-            current_experience = int(parts[1].split(" years")[0])
-
-    # Format previous roles (all except the first one)
-    prev_roles_str = ", ".join(roles_list[1:]) if len(roles_list) > 1 else ""
-
     # Prepare user data
     user_data = {
-        "current_role": current_role,
-        "experience": current_experience,
-        "prev_roles": prev_roles_str,
+        "roles": roles_data,
         "achievements": achievements,
-        "education": education,
+        "educations": education,
         "edu_achievements": edu_achievements,
         "goals": goals,
         "insights": insights,
+        "time_preference": time_preference,
+        "financial_weight": financial_weight,
+        "impact_weight": impact_weight,
+        "opportunity_weight": opportunity_weight,
         "include_novel_options": include_novel_options,
     }
 
@@ -103,35 +94,6 @@ def analyze_career(
     return result
 
 
-def share_to_linkedin(text):
-    """Generate a LinkedIn sharing link"""
-    share_link = get_share_link(text)
-    return f"Share on LinkedIn: {share_link}"
-
-
-def combine_roles(count, *args):
-    """Combine roles and experience into a formatted string"""
-    # Count is passed first, then all the textbox/number values
-    roles_text = ""
-
-    # Each role has a name and experience value
-    num_roles = count
-
-    for i in range(num_roles):
-        # Calculate the index in args for this role's name and experience
-        name_idx = i * 2
-        exp_idx = i * 2 + 1
-
-        if name_idx < len(args) and exp_idx < len(args):
-            role_name = args[name_idx]
-            experience = args[exp_idx]
-
-            if role_name and experience is not None:
-                roles_text += f"{role_name} ({experience} years)\n"
-
-    return roles_text.strip()
-
-
 # Building the interface
 with gr.Blocks(theme="soft") as demo:
     gr.Markdown(
@@ -142,23 +104,31 @@ with gr.Blocks(theme="soft") as demo:
         It evaluates options based on financial potential, human impact, and opportunity creation.
         """
     )
+    with gr.Row():
+        submit_btn = gr.Button("Analyze Career Paths", variant="primary", size="lg")
+        clear_btn = gr.Button("Clear All", variant="stop", size="lg")
+        example_btn = gr.Button("Load Example", variant="secondary", size="lg")
 
     # State for number of roles
     role_count = gr.State(1)  # Start with 1 role field
     education_count = gr.State(1)  # Start with 1 education field
     roles_data = gr.State("")  # State to store combined roles data
+    exps_data = gr.State("")  # State to store combined experiences
+    achievements_data = gr.State("")  # State to store combined achievements
+    educations_data = gr.State("")  # State to store combined educations
+    edu_achievements_data = gr.State("")  # State to store combined edu achievements
 
-    with gr.Row():
-        with gr.Column(scale=3):
-
-            @gr.render(inputs=role_count)
-            def render_roles(count):
+    @gr.render(inputs=[role_count, education_count])
+    def render_roles(r_count, e_count):
+        with gr.Row():
+            with gr.Column(scale=3):
                 roles = []
                 exps = []
                 achievements = []
-                role_fields = gr.Group()
+                educations = []
+                edu_achievements = []
 
-                with role_fields:
+                with gr.Group():
                     gr.Markdown("### Professional Information")
                     gr.Markdown("*Add your current and previous professional roles*")
                     with gr.Row():
@@ -171,7 +141,7 @@ with gr.Blocks(theme="soft") as demo:
                             size="sm",
                             key="remove_role_btn",
                         )
-                    for i in range(count):
+                    for i in range(r_count):
                         with gr.Row():
                             role = gr.Textbox(
                                 key=f"role_{i}",
@@ -198,25 +168,7 @@ with gr.Blocks(theme="soft") as demo:
                         exps.append(exp)
                         achievements.append(achievement)
 
-                add_role_btn.click(
-                    lambda x: x + 1,
-                    inputs=[role_count],
-                    outputs=[role_count],
-                )
-
-                remove_role_btn.click(
-                    lambda x: max(x - 1, 1),
-                    inputs=[role_count],
-                    outputs=[role_count],
-                )
-
-            @gr.render(inputs=education_count)
-            def render_education(count):
-                educations = []
-                edu_achievements = []
-
-                education_fields = gr.Group()
-                with education_fields:
+                with gr.Group():
                     gr.Markdown("### Educational Background")
                     gr.Markdown("*Add your current and previous academic experiences*")
                     with gr.Row():
@@ -232,7 +184,7 @@ with gr.Blocks(theme="soft") as demo:
                             size="sm",
                             key="remove_education_btn",
                         )
-                    for i in range(count):
+                    for i in range(e_count):
                         with gr.Row():
                             education = gr.Textbox(
                                 key=f"education_{i}",
@@ -261,157 +213,153 @@ with gr.Blocks(theme="soft") as demo:
                     outputs=[education_count],
                 )
 
-            with gr.Group():
-                gr.Markdown("### Future Plans")
-                goals = gr.Textbox(
-                    label="Career Goals",
-                    lines=3,
-                    placeholder="Describe your short-term and long-term career objectives",
-                )
-                insights = gr.Textbox(
-                    label="Additional Insights",
-                    lines=3,
-                    placeholder="Other relevant information like skills, interests, or constraints",
+                add_role_btn.click(
+                    lambda x: x + 1,
+                    inputs=[role_count],
+                    outputs=[role_count],
                 )
 
-            with gr.Group():
-                gr.Markdown("### Analysis Preferences")
-                time_preference = gr.Radio(
-                    [
-                        "Short-term (3 years)",
-                        "Mid-term (10 years)",
-                        "Long-term (10+ years)",
-                    ],
-                    label="Time Horizon Preference",
-                    value="Mid-term (10 years)",
+                remove_role_btn.click(
+                    lambda x: max(x - 1, 1),
+                    inputs=[role_count],
+                    outputs=[role_count],
                 )
 
-                include_novel = gr.Checkbox(
-                    label="Include novel/unconventional career options"
-                )
+                with gr.Group():
+                    gr.Markdown("### Future Plans")
+                    goals = gr.Textbox(
+                        label="Career Goals",
+                        lines=3,
+                        placeholder="Describe your short-term and long-term career objectives",
+                    )
+                    insights = gr.Textbox(
+                        label="Additional Insights",
+                        lines=3,
+                        placeholder="Other relevant information like skills, interests, or constraints",
+                    )
 
-                gr.Markdown("### Scoring Weights")
-                gr.Markdown(
-                    "*Adjust the importance of each factor in career evaluation*"
-                )
+                with gr.Group():
+                    gr.Markdown("### Analysis Preferences")
+                    gr.Markdown(
+                        "*Adjust the importance of each factor in career evaluation*"
+                    )
 
-                financial_weight = gr.Slider(
-                    minimum=0,
-                    maximum=10,
-                    value=5,
-                    step=1,
-                    label="Financial Potential",
-                    info="Earning potential and financial growth",
-                )
-                impact_weight = gr.Slider(
-                    minimum=0,
-                    maximum=10,
-                    value=5,
-                    step=1,
-                    label="Human Impact",
-                    info="Positive impact on others and society",
-                )
-                opportunity_weight = gr.Slider(
-                    minimum=0,
-                    maximum=10,
-                    value=5,
-                    step=1,
-                    label="Opportunity Creation",
-                    info="Doors opened for future growth and options",
-                )
+                    time_preference = gr.Radio(
+                        [
+                            "Short-term (3 years)",
+                            "Mid-term (10 years)",
+                            "Long-term (10+ years)",
+                        ],
+                        label="Time Horizon Preference",
+                        value="Mid-term (10 years)",
+                    )
 
-            with gr.Row():
-                submit_btn = gr.Button(
-                    "Analyze Career Paths", variant="primary", size="lg"
-                )
-                clear_btn = gr.Button("Clear All", variant="stop", size="lg")
-                example_btn = gr.Button("Load Example", variant="secondary", size="lg")
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            financial_weight = gr.Radio(
+                                [1, 2, 3],
+                                value=2,
+                                label="💰 Financial Potential",
+                                info="Earning potential and financial growth",
+                                elem_classes=["weight-radio"],
+                            )
+                        with gr.Column(scale=1):
+                            impact_weight = gr.Radio(
+                                [1, 2, 3],
+                                value=2,
+                                label="💫 Human Impact",
+                                info="Positive impact on others and society",
+                                elem_classes=["weight-radio"],
+                            )
+                        with gr.Column(scale=1):
+                            opportunity_weight = gr.Radio(
+                                [1, 2, 3],
+                                value=2,
+                                label="🚪 Opportunity Creation",
+                                info="Doors opened for future growth and options",
+                                elem_classes=["weight-radio"],
+                            )
 
-        with gr.Column(scale=2):
-            output = gr.Textbox(label="Career Analysis Report", lines=25)
+            with gr.Column(scale=2):
+                output = gr.Textbox(label="Career Analysis Report", lines=25)
 
-            with gr.Row():
-                copy_btn = gr.Button("📋 Copy to Clipboard", variant="secondary")
-                share_btn = gr.Button("🔗 Share on LinkedIn", variant="secondary")
+                with gr.Row():
+                    copy_btn = gr.Button("📋 Copy to Clipboard", variant="secondary")
+                    share_btn = gr.Button("🔗 Share on LinkedIn", variant="secondary")
 
-            share_output = gr.Textbox(label="Share Link", visible=False)
+                share_output = gr.Textbox(label="Share Link", visible=False)
 
-            # Add info section at the bottom
-            with gr.Accordion("About This Tool", open=False):
-                gr.Markdown(
-                    """
-                    This career analysis tool uses AI to generate personalized career path recommendations 
-                    based on your professional background, education, and goals.
-                    
-                    **How It Works:**
-                    1. Enter your current and previous roles with years of experience
-                    2. Provide information about your achievements and education
-                    3. Set your preferences for analysis (time horizon and factor weights)
-                    4. Get a detailed analysis of potential career paths with scoring
-                    
-                    The analysis evaluates each career path on three dimensions:
-                    - **Financial Potential**: Earning capacity and financial growth
-                    - **Human Impact**: Contribution to society and positive influence
-                    - **Opportunity Creation**: Future opportunities and career flexibility
-                    
-                    You can adjust the weights to prioritize what matters most to you.
-                    """
-                )
+                # Add info section at the bottom
+                with gr.Accordion("About This Tool", open=False):
+                    gr.Markdown(
+                        """
+                        This career analysis tool uses AI to generate personalized career path recommendations 
+                        based on your professional background, education, and goals.
+                        
+                        **How It Works:**
+                        1. Enter your current and previous roles with years of experience
+                        2. Provide information about your achievements and education
+                        3. Set your preferences for analysis (time horizon and factor weights)
+                        4. Get a detailed analysis of potential career paths with scoring
+                        
+                        The analysis evaluates each career path on three dimensions:
+                        - **Financial Potential**: Earning capacity and financial growth
+                        - **Human Impact**: Contribution to society and positive influence
+                        - **Opportunity Creation**: Future opportunities and career flexibility
+                        
+                        You can adjust the weights to prioritize what matters most to you.
+                        """
+                    )
 
-    """ # After the render function, use its return values
-    interface_components = render_roles.returns
-    roles_components = interface_components[0]  # List of role textboxes
-    exps_components = interface_components[1]  # List of experience number inputs
-    achievements_component = interface_components[2][0]  # First achievements textbox
-    education_component = interface_components[3][0]  # First education textbox
-    edu_achievements_component = interface_components[4][
-        0
-    ]  # First edu achievements textbox
+        # Set up main submit handler
+        submit_btn.click(
+            fn=lambda *args: process_input_data(
+                r_count,
+                args[: r_count * 2],  # roles and exps
+                args[r_count * 2 : r_count * 3],  # achievements
+                args[r_count * 3 : r_count * 3 + e_count],  # educations
+                args[r_count * 3 + e_count :],  # edu achievements
+            ),
+            inputs=[*roles, *exps, *achievements, *educations, *edu_achievements],
+            outputs=[
+                roles_data,
+                achievements_data,
+                educations_data,
+                edu_achievements_data,
+            ],
+            show_progress=False,
+        ).then(
+            analyze_career,
+            inputs=[
+                roles_data,  # Combined roles from the first step
+                achievements_data,  # Combined achievements
+                educations_data,  # Combined education
+                edu_achievements_data,  # Combined educational achievements
+                goals,
+                insights,
+                time_preference,
+                financial_weight,
+                impact_weight,
+                opportunity_weight,
+            ],
+            outputs=output,
+        )
 
-    # Collect all role inputs for the combine_roles function
-    all_role_inputs = [role_count]
-    for i in range(max(len(roles_components), len(exps_components))):
-        if i < len(roles_components):
-            all_role_inputs.append(roles_components[i])
-        if i < len(exps_components):
-            all_role_inputs.append(exps_components[i])
+        # Copy and share functionality
 
-    # Set up main submit handler
-    submit_btn.click(
-        combine_roles,
-        inputs=all_role_inputs,
-        outputs=roles_data,
-    ).then(
-        analyze_career,
-        inputs=[
-            roles_data,
-            achievements_component,
-            education_component,
-            edu_achievements_component,
-            goals,
-            insights,
-            time_preference,
-            include_novel,
-            financial_weight,
-            impact_weight,
-            opportunity_weight,
-        ],
-        outputs=output,
-    ) """
+        share_btn.click(share_to_linkedin, inputs=output, outputs=share_output)
+        share_btn.click(
+            lambda: True,
+            None,
+            share_output,
+            js="(x) => {share_output.style.display = 'block';}",
+        )
 
-    # Copy and share functionality
-    copy_btn.click(
-        copy_to_clipboard,
-        inputs=output,
-        outputs=gr.Textbox(value="Copied to clipboard!"),
-    )
-    share_btn.click(share_to_linkedin, inputs=output, outputs=share_output)
-    share_btn.click(
-        lambda: True,
-        None,
-        share_output,
-        js="(x) => {share_output.style.display = 'block';}",
-    )
+        copy_btn.click(
+            copy_to_clipboard,
+            inputs=output,
+        )
+
 
 # Launch the app
 if __name__ == "__main__":
