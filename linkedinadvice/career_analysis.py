@@ -17,7 +17,17 @@ class CareerAnalyzer:
         self.model_name = model_name
         self.temperature = temperature
 
-    def analyze(self, user_data):
+    def analyze(
+        self,
+        professional_background,
+        education_background,
+        goals,
+        insights,
+        time_preference,
+        financial_weight,
+        impact_weight,
+        opportunity_weight,
+    ):
         """
         Analyze career paths based on user data
 
@@ -30,74 +40,48 @@ class CareerAnalyzer:
             str: Formatted analysis results
         """
         # Use default equal weights if none provided
-        if scoring_weights is None:
-            scoring_weights = [
-                0.33,
-                0.33,
-                0.34,
-            ]  # Slightly more on opportunity to sum to 1.0
+        current_role = professional_background.split("\n\n")[0]
+        previous_roles = "\n\n".join(professional_background.split("\n\n")[1:])
 
-        # Parse the roles data to extract current role and experience
-        roles_list = user_data.get("roles", "").split("\n")
-
-        # Identify current role (first one in the list)
-        current_role = ""
-        current_experience = 0
-        if roles_list and roles_list[0]:
-            parts = roles_list[0].split(" (")
-            if len(parts) == 2:
-                current_role = parts[0]
-                exp_part = parts[1].split(" years")[0]
-                try:
-                    current_experience = int(exp_part)
-                except ValueError:
-                    current_experience = 0
-
-        # Format previous roles (all except the first one)
-        prev_roles_str = ", ".join(roles_list[1:]) if len(roles_list) > 1 else ""
 
         # Create the prompt with all available information
         prompt = f"""Analyze the following career profile and generate a taxonomy of potential career paths:
 
 Current Role: {current_role}
-Years in Current Role: {current_experience}
 """
 
         # Add previous roles if present
-        if prev_roles_str:
-            prompt += f"Previous Roles: {prev_roles_str}\n"
+        if previous_roles:
+            prompt += f"Previous Roles: {previous_roles}\n"
 
         # Add all the fields from user_data
-        prompt += f"""Professional Achievements: {user_data.get("achievements", "")}
-Educational Background: {user_data.get("educations", "")}
-Educational Achievements: {user_data.get("edu_achievements", "")}
-Career Goals: {user_data.get("goals", "")}
-Additional Insights: {user_data.get("insights", "")}
+        prompt += f"""
+Educational Background: {education_background}
+Career Goals: {goals}
+Additional Insights: {insights}
 
-Time Preference: {user_data.get("time_preference")}
-Financial Weight: {user_data.get("financial_weight", scoring_weights[0])}
-Impact Weight: {user_data.get("impact_weight", scoring_weights[1])}
-Opportunity Weight: {user_data.get("opportunity_weight", scoring_weights[2])}
+Time Preference: {time_preference}
+Financial Weight: {financial_weight}
+Impact Weight: {impact_weight}
+Opportunity Weight: {opportunity_weight}
 
-Generate 5 potential career paths that align with this profile. For each path, evaluate:
-1. Financial potential (scale 1-10) at 3, 10, and 10+ years
-2. Human impact potential (scale 1-10) at 3, 10, and 10+ years
-3. Opportunity creation potential (scale 1-10) at 3, 10, and 10+ years
+Help me as an expert career advisor. Provide a taxonomy to generate promising career paths on the timescale of {time_preference} and rate them them based on success on the short, medium and long term. For each path, evaluate:
+1. Financial potential (scale 1-3) at 3, 10, and 10+ years
+2. Human impact potential (scale 1-3) at 3, 10, and 10+ years
+3. Opportunity creation potential (scale 1-3) at 3, 10, and 10+ years
 
-Show your reasoning for each score. 
+Show your step by stepreasoning for each score. 
 
-Then calculate a weighted average based on the following weights:
-- Financial: {scoring_weights[0]}
-- Human Impact: {scoring_weights[1]}
-- Opportunity Creation: {scoring_weights[2]}
-
-And the time preference: {user_data.get("time_preference")}
+Then calculate an accurate weighted average based on the following weights:
+- Financial: {financial_weight}
+- Human Impact: {impact_weight}
+- Opportunity Creation: {opportunity_weight}
 
 Format the output clearly with sections for each career path, the scoring breakdown, and a final recommendation section ranking the paths from highest to lowest score.
 """
 
         # Add novel paths instruction if requested
-        if user_data.get("include_novel_options"):
+        if False:
             prompt += "\nPlease include at least one novel or unconventional career path in your analysis."
 
         # Print the prompt for debugging

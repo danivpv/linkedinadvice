@@ -21,36 +21,9 @@ analyzer = CareerAnalyzer(model_name="gpt-4o-mini")
 
 @monitor_api
 def analyze_career(
-    roles_data,
-    achievements,
-    education,
-    edu_achievements,
-    goals,
-    insights,
-    time_preference,
-    financial_weight,
-    impact_weight,
-    opportunity_weight,
+    *args,
 ):
-    # Normalize weights to ensure they sum to 1
-
-    # Prepare user data
-    user_data = {
-        "roles": roles_data,
-        "achievements": achievements,
-        "educations": education,
-        "edu_achievements": edu_achievements,
-        "goals": goals,
-        "insights": insights,
-        "time_preference": time_preference,
-        "financial_weight": financial_weight,
-        "impact_weight": impact_weight,
-        "opportunity_weight": opportunity_weight,
-    }
-
-    # Get analysis
-
-    result = analyzer.analyze(user_data)
+    result = analyzer.analyze(*args)
 
     return result
 
@@ -60,17 +33,20 @@ with gr.Blocks(theme="soft") as demo:
     # State for number of roles
     role_count = gr.State(1)  # Start with 1 role field
     education_count = gr.State(1)  # Start with 1 education field
+    professional_background_dict = gr.State({})  # State to store combined roles data
+    education_background_dict = gr.State({})  # State to store combined education data
     professional_background = gr.State("")  # State to store combined roles data
     professional_achievements = gr.State("")  # State to store combined roles data
     education_background = gr.State("")  # State to store combined education background
     education_achievements = gr.State("")  # State to store education achievements
     goals = gr.State("")  # State to store combined goals
     insights = gr.State("")  # State to store combined insights
-    time_preference = gr.State("")  # State to store time preference
+    time_preference = gr.State("Mid-term (10 years)")  # State to store time preference
     financial_weight = gr.State(2)  # State to store financial weight
     impact_weight = gr.State(2)  # State to store impact weight
     opportunity_weight = gr.State(2)  # State to store opportunity weight
     output = gr.State("")  # State to store output
+    raw_list_inputs = gr.State([])  # State to store raw list inputs
 
     gr.Markdown(
         """
@@ -83,7 +59,7 @@ with gr.Blocks(theme="soft") as demo:
 
     with gr.Row():
         submit_btn = gr.Button("Analyze Career Paths", variant="primary", size="lg")
-        clear_btn = gr.Button("Clear All", variant="stop", size="lg")
+        clear_btn = gr.Button("Clear", variant="stop", size="lg")
         example_btn = gr.Button("Load Example", variant="secondary", size="lg")
 
     with gr.Row():
@@ -117,20 +93,73 @@ with gr.Blocks(theme="soft") as demo:
                 @gr.render(inputs=role_count)
                 def render_roles(r_count):
                     for i in range(r_count):
+                        if i not in professional_background_dict.value:
+                            professional_background_dict.value[i] = {
+                                "role": "",
+                                "exp": "",
+                                "professional_achievement": "",
+                            }
                         with gr.Row():
+                            interactive = i == r_count - 1
                             role = gr.Textbox(
                                 key=f"role_{i}",
                                 label=f"Role {i + 1}"
                                 + (" (Current)" if i == 0 else ""),
                                 placeholder=ROLE_PLACEHOLDER[i % len(ROLE_PLACEHOLDER)],
                                 scale=3,
+                                interactive=interactive,
+                                inputs=professional_background_dict.value[i].get(
+                                    "role", ""
+                                ),
                             )
+
+                            def update_professional_background_dict(key, value, i):
+                                professional_background_dict.value[i][key] = value
+                                final_string = ""
+                                for i in professional_background_dict.value:
+                                    role = professional_background_dict.value[i].get(
+                                        "role"
+                                    )
+                                    exp = professional_background_dict.value[i].get(
+                                        "exp"
+                                    )
+                                    professional_achievement = (
+                                        professional_background_dict.value[i].get(
+                                            "professional_achievement"
+                                        )
+                                    )
+                                    final_string += f"{role} - {exp} years. Achieved: \n{professional_achievement}\n\n"
+
+                                return professional_background_dict.value, final_string
+
+                            role.input(
+                                lambda x: update_professional_background_dict(
+                                    "role", x, i
+                                ),
+                                inputs=[role],
+                                outputs=[
+                                    professional_background_dict,
+                                    professional_background,
+                                ],
+                            )
+
                             exp = gr.Number(
                                 key=f"exp_{i}",
                                 label="Years",
                                 value=1,
                                 minimum=0,
                                 scale=1,
+                                interactive=interactive,
+                            )
+                            exp.input(
+                                lambda x: update_professional_background_dict(
+                                    "exp", x, i
+                                ),
+                                inputs=[exp],
+                                outputs=[
+                                    professional_background_dict,
+                                    professional_background,
+                                ],
                             )
 
                         professional_achievement = gr.Textbox(
@@ -138,13 +167,23 @@ with gr.Blocks(theme="soft") as demo:
                             label="Notable Achievements",
                             lines=2,
                             placeholder="List key accomplishments, awards, or significant contributions.",
+                            interactive=interactive,
                         )
-                        if professional_achievement.value:
-                            professional_achievements.value += (
-                                professional_achievement.value
-                            )
-                        if professional_background.value:
-                            professional_background.value += f"{role} - {exp} years\n"
+
+                        professional_achievement.input(
+                            lambda x: update_professional_background_dict(
+                                "professional_achievement", x, i
+                            ),
+                            inputs=[professional_achievement],
+                            outputs=[
+                                professional_background_dict,
+                                professional_background,
+                            ],
+                        )
+
+                        raw_list_inputs.value.extend(
+                            [role, exp, professional_achievement]
+                        )
 
             with gr.Group():
                 gr.Markdown("### Educational Background")
@@ -179,6 +218,11 @@ with gr.Blocks(theme="soft") as demo:
                 @gr.render(inputs=education_count)
                 def render_education(e_count):
                     for i in range(e_count):
+                        if i not in education_background_dict.value:
+                            education_background_dict.value[i] = {
+                                "education": "",
+                                "education_achievement": "",
+                            }
                         with gr.Row():
                             education = gr.Textbox(
                                 key=f"education_{i}",
@@ -186,16 +230,56 @@ with gr.Blocks(theme="soft") as demo:
                                 lines=3,
                                 placeholder="e.g. Bachelor of Science in Computer Science, University of Technology",
                             )
+
+                            def update_educational_background_dict(key, value, i):
+                                education_background_dict.value[i][key] = value
+                                final_string = ""
+                                for i in education_background_dict.value:
+                                    education = education_background_dict.value[i].get(
+                                        "education"
+                                    )
+                                    edu_achievement = education_background_dict.value[
+                                        i
+                                    ].get("edu_achievement")
+                                    final_string += f"{education}. Achieved: \n{edu_achievement}\n\n"
+
+                                return education_background_dict.value, final_string
+
+                            education.input(
+                                lambda x: update_educational_background_dict(
+                                    "education", x, i
+                                ),
+                                inputs=[education],
+                                outputs=[
+                                    education_background_dict,
+                                    education_background,
+                                ],
+                            )
+
                             edu_achievement = gr.Textbox(
                                 key=f"edu_achievement_{i}",
                                 label="Academic Achievements",
                                 lines=3,
                                 placeholder="Awards, honors, notable projects or research during your education",
                             )
+
+                            edu_achievement.input(
+                                lambda x: update_educational_background_dict(
+                                    "education_achievement", x, i
+                                ),
+                                inputs=[education_achievements],
+                                outputs=[
+                                    education_background_dict,
+                                    education_background,
+                                ],
+                            )
+
                         if education.value:
                             education_background.value += education.value
                         if edu_achievement.value:
                             education_achievements.value += edu_achievement.value
+
+                        raw_list_inputs.value.extend([education, edu_achievement])
 
             with gr.Group():
                 gr.Markdown("### Future Plans")
@@ -260,7 +344,13 @@ with gr.Blocks(theme="soft") as demo:
                         )
 
         with gr.Column(scale=2):
-            output_box = gr.Textbox(label="Career Analysis Report", lines=25)
+            output_box = gr.Markdown(
+                output.value,
+                label="Career Analysis Report",
+                container=True,
+                height=614,
+                show_copy_button=False,
+            )
 
             with gr.Row():
                 copy_btn = gr.Button("📋 Copy to Clipboard", variant="secondary")
@@ -269,7 +359,7 @@ with gr.Blocks(theme="soft") as demo:
                 # Copy and share functionality
                 copy_btn.click(
                     copy_to_clipboard,
-                    inputs=output,
+                    inputs=output_box,
                 )
 
             # Add info section at the bottom
@@ -295,12 +385,10 @@ with gr.Blocks(theme="soft") as demo:
                 )
 
     submit_btn.click(
-        export_state,
+        lambda *args: analyze_career(*args) if export_state(*args) or True else None,
         inputs=[
             professional_background,
-            professional_achievements,
             education_background,
-            education_achievements,
             goals,
             insights,
             time_preference,
@@ -311,6 +399,17 @@ with gr.Blocks(theme="soft") as demo:
         outputs=[output_box],
     )
 
+    clear_btn.click(
+        fn=lambda: None, inputs=[], outputs=[], js="() => location.reload()"
+    )
+
+    """ 
+    example_btn.click(
+        fn=lambda _: SAMPLE_RESULT,
+        inputs=[output_box],
+        outputs=[output_box],
+    )
+     """
 
 # Launch the app
 if __name__ == "__main__":
