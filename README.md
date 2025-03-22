@@ -4,9 +4,9 @@ emoji: 🚀
 colorFrom: blue
 colorTo: green
 sdk: gradio
-sdk_version: 3.50.2
+sdk_version: 5.22.0
 app_file: app/main.py
-pinned: false
+pinned: true
 ---
 
 # LinkedIn Career Advisor 🚀
