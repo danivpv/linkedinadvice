@@ -6,18 +6,10 @@ Handles input processing, clipboard operations, and sharing functionality.
 import re
 import urllib.parse
 
+import pyperclip
+
 
 def combine_roles(count, *args):
-    """
-    Combine roles and experience into a formatted string.
-
-    Args:
-        count (int): Number of roles to process
-        *args: List of alternating role names and experience years
-
-    Returns:
-        str: Formatted string of roles with experience years
-    """
     roles_text = ""
 
     for i in range(count):
@@ -42,16 +34,6 @@ def share_to_linkedin(text):
 
 
 def combine_text_fields(text_list):
-    """
-    Combine multiple text fields into a single string, separated by newlines.
-    Filters out any empty inputs.
-
-    Args:
-        text_list (list): List of text strings to combine
-
-    Returns:
-        str: Combined string with entries separated by double newlines
-    """
     return "\n\n".join([text for text in text_list if text])
 
 
@@ -73,15 +55,6 @@ def format_for_linkedin(text):
 
 
 def get_share_link(text):
-    """
-    Generate a LinkedIn sharing link with the provided text.
-
-    Args:
-        text (str): Text to share on LinkedIn
-
-    Returns:
-        str: URL for sharing on LinkedIn
-    """
     # Create a shortened version for sharing (LinkedIn has character limits)
     summary = text[:500] + "..." if len(text) > 500 else text
 
@@ -108,13 +81,41 @@ def process_input_data(
     education_data = combine_text_fields(educations)
     edu_achievements_data = combine_text_fields(edu_achievements)
 
-    print(roles_data)
-    print(achievements_data)
-    print(education_data)
-    print(edu_achievements_data)
-
     return roles_data, achievements_data, education_data, edu_achievements_data
 
 
 def copy_to_clipboard(text):
-    pass
+    """Copy text to clipboard"""
+    pyperclip.copy(text)
+    return "Report copied to clipboard!"
+
+
+def export_state(
+    professional_background,
+    professional_achievements,
+    education_background,
+    education_achievements,
+    goals,
+    insights,
+    time_preference,
+    financial_weight,
+    impact_weight,
+    opportunity_weight,
+) -> str:
+    state_dict = {
+        "Professional Background": professional_background,
+        "Professional Achievements": professional_achievements,
+        "Education Background": education_background,
+        "Education Achievements": education_achievements,
+        "Goals": goals,
+        "Insights": insights,
+        "Time Preference": time_preference,
+        "Financial Weight": financial_weight,
+        "Impact Weight": impact_weight,
+        "Opportunity Weight": opportunity_weight,
+    }
+
+    formatted_output = "\n".join(f"{key}: {value}" for key, value in state_dict.items())
+    print(formatted_output)
+
+    return formatted_output

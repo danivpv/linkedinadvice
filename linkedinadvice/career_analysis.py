@@ -17,7 +17,7 @@ class CareerAnalyzer:
         self.model_name = model_name
         self.temperature = temperature
 
-    def analyze(self, user_data, time_preference, scoring_weights=None):
+    def analyze(self, user_data):
         """
         Analyze career paths based on user data
 
@@ -74,7 +74,7 @@ Educational Achievements: {user_data.get("edu_achievements", "")}
 Career Goals: {user_data.get("goals", "")}
 Additional Insights: {user_data.get("insights", "")}
 
-Time Preference: {time_preference}
+Time Preference: {user_data.get("time_preference")}
 Financial Weight: {user_data.get("financial_weight", scoring_weights[0])}
 Impact Weight: {user_data.get("impact_weight", scoring_weights[1])}
 Opportunity Weight: {user_data.get("opportunity_weight", scoring_weights[2])}
@@ -91,7 +91,7 @@ Then calculate a weighted average based on the following weights:
 - Human Impact: {scoring_weights[1]}
 - Opportunity Creation: {scoring_weights[2]}
 
-And the time preference: {time_preference}
+And the time preference: {user_data.get("time_preference")}
 
 Format the output clearly with sections for each career path, the scoring breakdown, and a final recommendation section ranking the paths from highest to lowest score.
 """

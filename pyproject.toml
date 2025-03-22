@@ -17,14 +17,15 @@ dependencies = [
     "python-dotenv>=1.0.1",
 ]
 
-# Development and testing dependencies
+[dependency-groups]
 dev = [
-    "poethepoet>=0.32.2",
+    "poethepoet>=0.33.1",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-
 [tool.poe.tasks]
+start = "uv run gradio app/main.py"
+
