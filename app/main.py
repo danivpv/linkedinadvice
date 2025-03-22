@@ -3,7 +3,7 @@ import os
 import gradio as gr
 from dotenv import load_dotenv
 
-from app.constants import ROLE_PLACEHOLDER
+from app.constants import ROLE_PLACEHOLDER, SAMPLE_RESULT
 from app.utils import copy_to_clipboard, export_state
 from linkedinadvice.career_analysis import CareerAnalyzer
 from linkedinadvice.monitoring import monitor_api
@@ -346,10 +346,10 @@ with gr.Blocks(theme="soft") as demo:
         with gr.Column(scale=2):
             output_box = gr.Markdown(
                 output.value,
-                label="Career Analysis Report",
                 container=True,
                 height=614,
-                show_copy_button=False,
+                show_copy_button=True,
+                key="output_box",
             )
 
             with gr.Row():
@@ -403,13 +403,12 @@ with gr.Blocks(theme="soft") as demo:
         fn=lambda: None, inputs=[], outputs=[], js="() => location.reload()"
     )
 
-    """ 
     example_btn.click(
         fn=lambda _: SAMPLE_RESULT,
         inputs=[output_box],
         outputs=[output_box],
     )
-     """
+
 
 # Launch the app
 if __name__ == "__main__":
